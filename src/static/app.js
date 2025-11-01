@@ -16,7 +16,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!participants || participants.length === 0) {
       return `<div class="participants"><h5>Participants</h5><div class="none">No participants yet</div></div>`;
     }
-    const items = participants.map((p) => `<li>${escapeHtml(p)}</li>`).join("");
+    const items = participants
+      .map((p) =>
+        `<li><span class="p-email">${escapeHtml(p)}</span><button class="delete-btn" data-email="${escapeAttr(
+          p
+        )}" title="Unregister">🗑️</button></li>`
+      )
+      .join("");
     return `<div class="participants"><h5>Participants</h5><ul>${items}</ul></div>`;
   }
 
@@ -67,6 +73,45 @@ document.addEventListener("DOMContentLoaded", () => {
       activitySelect.appendChild(opt);
     });
   }
+
+  // helper to escape attribute values
+  function escapeAttr(str) {
+    return String(str).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
+  }
+
+  // Delegate delete clicks from the activities list
+  activitiesList.addEventListener("click", async (event) => {
+    const btn = event.target.closest(".delete-btn");
+    if (!btn) return;
+    const li = btn.closest("li");
+    // find activity name from nearest card
+    const card = btn.closest(".activity-card");
+    if (!card) return;
+    const activityName = card.querySelector("h4").textContent;
+    const email = btn.dataset.email;
+    if (!email) return;
+
+    if (!confirm(`Unregister ${email} from ${activityName}?`)) return;
+
+    try {
+      const url = `/activities/${encodeURIComponent(activityName)}/participants?email=${encodeURIComponent(
+        email
+      )}`;
+      const res = await fetch(url, { method: "DELETE" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = body.detail || body.message || "Could not unregister";
+        showMessage("error", detail);
+        return;
+      }
+      showMessage("success", body.message || "Unregistered successfully");
+      // remove the participant from the DOM quickly
+      if (li) li.remove();
+    } catch (err) {
+      console.error(err);
+      showMessage("error", "Network error while unregistering.");
+    }
+  });
 
   function showMessage(type, text) {
     messageDiv.className = "";
